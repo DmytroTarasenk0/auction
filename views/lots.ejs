@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Lots</title>
+</head>
+<body>
+  <h1>Lots</h1>
+  <% if (lots.length === 0) { %>
+    <p>There is no lots for now.</p>
+  <% } else { %>
+    <ul>
+      <% lots.forEach(lot => { %>
+        <li>
+          <a href="/lots/<%= lot.id %>"><%= lot.title %></a> — <%= lot.startingPrice %> грн
+        </li>
+      <% }) %>
+    </ul>
+  <% } %>
+  <% if (user) { %>
+    <a href="/lots/new">Create a new lot</a>
+  <% } else { %>
+    <p>For a creation you need to login <a href="/login">Login</a> </p>
+  <% } %>
+</body>
+</html>

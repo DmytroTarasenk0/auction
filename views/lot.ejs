@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title><%= lot.title %></title>
+</head>
+<body>
+  <h1><%= lot.title %></h1>
+  <p><strong>Starting price:</strong> <%= lot.startingPrice %> грн</p>
+  <p><strong>Опис:</strong> <%= lot.description %></p>
+  <% if (user && user.id === lot.userId) { %>
+    <form action="/lots/<%= lot.id %>/delete" method="POST">
+      <button type="submit">Delete lot</button>
+    </form>
+  <% } %>  
+  <a href="/">Back to lots</a>
+</body>
+</html>
