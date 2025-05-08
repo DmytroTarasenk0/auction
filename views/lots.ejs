@@ -4,22 +4,37 @@
   <title>Lots</title>
 </head>
 <body>
-  <h1>Lots</h1>
-  <% if (lots.length === 0) { %>
-    <p>There is no lots for now.</p>
-  <% } else { %>
-    <ul>
-      <% lots.forEach(lot => { %>
-        <li>
-          <a href="/lots/<%= lot.id %>"><%= lot.title %></a> — <%= lot.startingPrice %> грн
-        </li>
-      <% }) %>
-    </ul>
-  <% } %>
   <% if (user) { %>
-    <a href="/lots/new">Create a new lot</a>
+    <p>Welcome, <%= user.username %> | Balance: <%= user.balance %> грн</p>
+    <form action="/logout" method="get">
+      <button>Logout</button>
+    </form>
+    <form action="/add-funds" method="post">
+      <input type="number" name="amount" placeholder="Sum" required>
+      <button type="submit">Submit</button>
+    </form>
+    <a href="/create">Create lot</a>
   <% } else { %>
-    <p>For a creation you need to login <a href="/login">Login</a> </p>
+    <a href="/login">Login</a>
+    <a href="/register">Register</a>
   <% } %>
+
+  <% if (message) { %>
+    <p><%= message %></p>
+  <% } %>
+
+  <h2>Lots</h2>
+  <ul>
+    <% lots.forEach(lot => { %>
+      <li>
+        <a href="/lots/<%= lot.id %>"><%= lot.title %></a> - <%= lot.startingPrice %> грн
+        <% if (user && user.id === lot.userId) { %>
+          <form action="/lots/<%= lot.id %>/delete" method="post" style="display:inline">
+            <button type="submit">Delete</button>
+          </form>
+        <% } %>
+      </li>
+    <% }) %>
+  </ul>
 </body>
 </html>
