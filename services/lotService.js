@@ -1,5 +1,6 @@
 const { poolPromise, sql } = require('../db/sql');
 const Lot = require('../models/lotModel');
+const UserService = require('./userService');
 
 const LotService = {
   async getAllLots() {
@@ -20,30 +21,33 @@ const LotService = {
   },
 
   async createLot(lot) {
+    const TAX = 25;
     const pool = await poolPromise;
-    await pool.request()
-      .input('title', sql.NVarChar, lot.title)
-      .input('startingPrice', sql.Decimal(18, 2), lot.startingPrice)
-      .input('description', sql.NVarChar, lot.description)
-      .input('userId', sql.Int, lot.userId)
-      .query(`
-        INSERT INTO Lots (title, startingPrice, description, userId)
-        VALUES (@title, @startingPrice, @description, @userId)
-      `);
-  },
+    const transaction = new sql.Transaction(pool);
+    try {
+      await transaction.begin();
 
-  async updateLot(id, lot) {
-    const pool = await poolPromise;
-    await pool.request()
-      .input('id', sql.Int, id)
-      .input('title', sql.NVarChar, lot.title)
-      .input('startingPrice', sql.Decimal(18, 2), lot.startingPrice)
-      .input('description', sql.NVarChar, lot.description)
-      .query(`
-        UPDATE Lots
-        SET title = @title, startingPrice = @startingPrice, description = @description
-        WHERE id = @id
-      `);
+      const user = await UserService.getUserById(lot.userId);
+      if (!user || user.balance < TAX) throw new Error('insufficient funds');
+
+      const request = new sql.Request(transaction);
+      await request
+        .input('userId', sql.Int, lot.userId)
+        .input('amount', sql.Decimal(18, 2), TAX)
+        .query('UPDATE Users SET balance = balance - @amount WHERE id = @userId');
+
+      await request
+        .input('title', sql.NVarChar, lot.title)
+        .input('startingPrice', sql.Decimal(18, 2), lot.startingPrice)
+        .input('description', sql.NVarChar, lot.description)
+        .query(`INSERT INTO Lots (title, startingPrice, description, userId)
+                VALUES (@title, @startingPrice, @description, @userId)`);
+
+      await transaction.commit();
+    } catch (err) {
+      await transaction.rollback();
+      throw err;
+    }
   },
 
   async deleteLot(id, userId) {
