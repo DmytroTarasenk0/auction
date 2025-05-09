@@ -7,5 +7,6 @@ router.get('/lots/:id', lotController.viewLot);
 router.get('/create', lotController.showCreateForm);
 router.post('/create', lotController.createLot);
 router.post('/lots/:id/delete', lotController.deleteLot);
+router.post('/lots/:id/close', lotController.closeAuction);
 
 module.exports = router;

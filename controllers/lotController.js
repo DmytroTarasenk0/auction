@@ -48,12 +48,32 @@ const lotController = {
     const lotId = parseInt(req.params.id);
     const lot = await LotService.getLotById(lotId);
 
-    if (!lot) return res.status(404).send('No lot found');
+    if (!lot) return res.status(404).send('Lot not found');
     if (!req.session.user || req.session.user.id !== lot.userId)
       return res.status(403).send('Not authorized to delete this lot');
 
-    await LotService.deleteLot(lotId, req.session.user.id);
+    try {
+      await LotService.deleteLot(lotId, req.session.user.id);
+      req.session.message = 'Lot deleted successfully';
+    } catch (err) {
+      req.session.message = `Error: ${err.message}`;
+    }
+
     res.redirect('/');
+  },
+
+  async closeAuction(req, res) {
+    const lotId = parseInt(req.params.id);
+    const userId = req.session.user.id;
+
+    try {
+      await LotService.closeAuction(lotId, userId);
+      req.session.message = 'Auction closed';
+    } catch (err) {
+      req.session.message = `Error: ${err.message}`;
+    }
+
+    res.redirect(`/lots/${lotId}`);
   }
 };
 
