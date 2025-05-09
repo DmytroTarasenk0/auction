@@ -27,12 +27,7 @@
   <ul>
     <% lots.forEach(lot => { %>
       <li>
-        <a href="/lots/<%= lot.id %>"><%= lot.title %></a> - <%= lot.startingPrice %> грн
-        <% if (user && user.id === lot.userId) { %>
-          <form action="/lots/<%= lot.id %>/delete" method="post" style="display:inline">
-            <button type="submit">Delete</button>
-          </form>
-        <% } %>
+        <a href="/lots/<%= lot.id %>"><%= lot.title %></a> - <%= lot.currentPrice || lot.startingPrice %> грн, Status: <%= lot.isActive ? 'active' : 'closed' %>
       </li>
     <% }) %>
   </ul>
