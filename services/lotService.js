@@ -72,11 +72,11 @@ const LotService = {
             .input('amount', sql.Decimal(18, 2), highestBid.amount)
             .query(`UPDATE Users SET balance = balance + @amount WHERE id = @userId`);
         }
+      }
 
-        await new sql.Request(transaction)
+      await new sql.Request(transaction)
           .input('lotId', sql.Int, id)
           .query('DELETE FROM Bids WHERE lotId = @lotId');
-      }
 
       await new sql.Request(transaction)
         .input('id', sql.Int, id)
