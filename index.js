@@ -4,11 +4,13 @@ const path = require('path');
 const userRoutes = require('./routes/userRoutes');
 const lotRoutes = require('./routes/lotRoutes');
 const bidRoutes = require('./routes/bidRoutes');
+require('./db/sequelize');
 
 const app = express();
 
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
+app.use(express.static(path.join(__dirname, 'public')));
 
 app.use(express.urlencoded({ extended: false }));
 app.use(session({
