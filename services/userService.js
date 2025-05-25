@@ -1,76 +1,40 @@
-const { poolPromise, sql } = require('../db/sql');
-const User = require('../models/userModel');
 const bcrypt = require('bcrypt');
+const { User } = require('../db/sequelize');
 
 const UserService = {
   async getUserById(id) {
-    const pool = await poolPromise;
-    const result = await pool.request()
-      .input('id', sql.Int, id)
-      .query('SELECT * FROM Users WHERE id = @id');
-    const r = result.recordset[0];
-    return r ? new User(r.id, r.username, r.password, r.balance) : null;
+    return await User.findByPk(id);
   },
 
   async findByUsername(username) {
-    const pool = await poolPromise;
-    const result = await pool.request()
-      .input('username', sql.NVarChar, username)
-      .query('SELECT * FROM Users WHERE username = @username');
-    const r = result.recordset[0];
-    return r ? new User(r.id, r.username, r.password, r.balance) : null;
+    return await User.findOne({ where: { username } });
   },
 
   async createUser(username, password) {
-    const pool = await poolPromise;
     const hashedPassword = await bcrypt.hash(password, 10);
-    await pool.request()
-      .input('username', sql.NVarChar, username)
-      .input('password', sql.NVarChar, hashedPassword)
-      .query('INSERT INTO Users (username, password, balance) VALUES (@username, @password, 0)');
+    await User.create({ username, password: hashedPassword, balance: 0 });
   },
 
   async addFunds(userId, amount) {
-    const pool = await poolPromise;
-    const transaction = new sql.Transaction(pool);
-    try {
-      await transaction.begin();
-      const request = new sql.Request(transaction);
-      if (amount % 10 === 0) throw new Error('Sum cant be a multiple of 10');
+    if (amount % 10 === 0) throw new Error('Sum cant be a multiple of 10');
 
-      await request
-        .input('userId', sql.Int, userId)
-        .input('amount', sql.Decimal(18, 2), amount)
-        .query('UPDATE Users SET balance = balance + @amount WHERE id = @userId');
-
-      await transaction.commit();
+    return await User.sequelize.transaction(async (t) => {
+      const user = await User.findByPk(userId, { transaction: t });
+      if (!user) throw new Error('User not found');
+      user.balance += parseFloat(amount);
+      await user.save({ transaction: t });
       return true;
-    } catch (err) {
-      await transaction.rollback();
-      throw err;
-    }
+    });
   },
 
   async deductFunds(userId, amount) {
-    const pool = await poolPromise;
-    const transaction = new sql.Transaction(pool);
-    try {
-      await transaction.begin();
-      const user = await this.getUserById(userId);
+    return await User.sequelize.transaction(async (t) => {
+      const user = await User.findByPk(userId, { transaction: t });
       if (!user || user.balance < amount) throw new Error('insufficient funds');
-
-      const request = new sql.Request(transaction);
-      await request
-        .input('userId', sql.Int, userId)
-        .input('amount', sql.Decimal(18, 2), amount)
-        .query('UPDATE Users SET balance = balance - @amount WHERE id = @userId');
-
-      await transaction.commit();
+      user.balance -= parseFloat(amount);
+      await user.save({ transaction: t });
       return true;
-    } catch (err) {
-      await transaction.rollback();
-      throw err;
-    }
+    });
   }
 };
 

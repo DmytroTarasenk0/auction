@@ -1,135 +1,84 @@
-const { poolPromise, sql } = require('../db/sql');
-const UserService = require('./userService');
+const { User, Lot, Bid, sequelize } = require('../db/sequelize');
 
 const LotService = {
   async getAllLots() {
-    const pool = await poolPromise;
-    const result = await pool.request().query('SELECT * FROM Lots');
-    return result.recordset;
+    return await Lot.findAll();
   },
 
   async getLotById(id) {
-    const pool = await poolPromise;
-    const result = await pool.request()
-      .input('id', sql.Int, id)
-      .query('SELECT * FROM Lots WHERE id = @id');
-    return result.recordset[0] || null;
+    return await Lot.findByPk(id);
   },
 
   async createLot(lot) {
     const TAX = 25;
-    const pool = await poolPromise;
-    const transaction = new sql.Transaction(pool);
-    try {
-      await transaction.begin();
 
-      const user = await UserService.getUserById(lot.userId);
+    return await sequelize.transaction(async (t) => {
+      const user = await User.findByPk(lot.userId, { transaction: t });
       if (!user || user.balance < TAX) throw new Error('insufficient funds');
 
-      const request = new sql.Request(transaction);
-      await request
-        .input('userId', sql.Int, lot.userId)
-        .input('amount', sql.Decimal(18, 2), TAX)
-        .query('UPDATE Users SET balance = balance - @amount WHERE id = @userId');
+      user.balance -= TAX;
+      await user.save({ transaction: t });
 
-      await request
-        .input('title', sql.NVarChar, lot.title)
-        .input('startingPrice', sql.Decimal(18, 2), lot.startingPrice)
-        .input('description', sql.NVarChar, lot.description)
-        .query(`INSERT INTO Lots (title, startingPrice, description, userId)
-                VALUES (@title, @startingPrice, @description, @userId)`);
-
-      await transaction.commit();
-    } catch (err) {
-      await transaction.rollback();
-      throw err;
-    }
+      await Lot.create({
+        title: lot.title,
+        startingPrice: lot.startingPrice,
+        description: lot.description,
+        userId: lot.userId,
+        currentPrice: null,
+        winnerId: null,
+        isActive: true
+      }, { transaction: t });
+    });
   },
 
   async deleteLot(id, userId) {
-    const pool = await poolPromise;
-    const transaction = new sql.Transaction(pool);
-    try {
-      await transaction.begin();
-
-      const lotResult = await new sql.Request(transaction)
-        .input('id', sql.Int, id)
-        .query('SELECT * FROM Lots WHERE id = @id');
-
-      const lot = lotResult.recordset[0];
+    return await sequelize.transaction(async (t) => {
+      const lot = await Lot.findByPk(id, { transaction: t });
       if (!lot || lot.userId !== userId) throw new Error('Lot not found or unauthorized');
 
       if (lot.isActive) {
-        const bidResult = await new sql.Request(transaction)
-          .input('lotId', sql.Int, id)
-          .query(`SELECT TOP 1 * FROM Bids WHERE lotId = @lotId ORDER BY amount DESC`);
-
-        const highestBid = bidResult.recordset[0];
+        const highestBid = await Bid.findOne({
+          where: { lotId: id },
+          order: [['amount', 'DESC']],
+          transaction: t
+        });
 
         if (highestBid) {
-          await new sql.Request(transaction)
-            .input('userId', sql.Int, highestBid.userId)
-            .input('amount', sql.Decimal(18, 2), highestBid.amount)
-            .query(`UPDATE Users SET balance = balance + @amount WHERE id = @userId`);
+          const user = await User.findByPk(highestBid.userId, { transaction: t });
+          user.balance += parseFloat(highestBid.amount);
+          await user.save({ transaction: t });
         }
       }
 
-      await new sql.Request(transaction)
-          .input('lotId', sql.Int, id)
-          .query('DELETE FROM Bids WHERE lotId = @lotId');
-
-      await new sql.Request(transaction)
-        .input('id', sql.Int, id)
-        .input('userId', sql.Int, userId)
-        .query('DELETE FROM Lots WHERE id = @id AND userId = @userId');
-
-      await transaction.commit();
-    } catch (err) {
-      await transaction.rollback();
-      throw err;
-    }
+      await Bid.destroy({ where: { lotId: id }, transaction: t });
+      await Lot.destroy({ where: { id, userId }, transaction: t });
+    });
   },
 
   async closeAuction(lotId, userId) {
-    const pool = await poolPromise;
-    const transaction = new sql.Transaction(pool);
-    try {
-      await transaction.begin();
-
-      const lotResult = await new sql.Request(transaction)
-        .input('id', sql.Int, lotId)
-        .query('SELECT * FROM Lots WHERE id = @id');
-
-      const lot = lotResult.recordset[0];
+    return await sequelize.transaction(async (t) => {
+      const lot = await Lot.findByPk(lotId, { transaction: t });
       if (!lot || lot.userId !== userId || !lot.isActive) throw new Error('Invalid lot');
 
-      const bidResult = await new sql.Request(transaction)
-        .input('lotId', sql.Int, lotId)
-        .query(`SELECT TOP 1 * FROM Bids WHERE lotId = @lotId ORDER BY amount DESC`);
-
-      const highestBid = bidResult.recordset[0];
+      const highestBid = await Bid.findOne({
+        where: { lotId },
+        order: [['amount', 'DESC']],
+        transaction: t
+      });
 
       if (highestBid) {
-        await new sql.Request(transaction)
-          .input('amount', sql.Decimal(18, 2), highestBid.amount)
-          .input('userId', sql.Int, lot.userId)
-          .query('UPDATE Users SET balance = balance + @amount WHERE id = @userId');
+        const seller = await User.findByPk(lot.userId, { transaction: t });
+        seller.balance += parseFloat(highestBid.amount);
+        await seller.save({ transaction: t });
 
-        await new sql.Request(transaction)
-          .input('id', sql.Int, lotId)
-          .input('winnerId', sql.Int, highestBid.userId)
-          .query('UPDATE Lots SET isActive = 0, winnerId = @winnerId WHERE id = @id');
+        lot.isActive = false;
+        lot.winnerId = highestBid.userId;
+        await lot.save({ transaction: t });
       } else {
-        await new sql.Request(transaction)
-          .input('id', sql.Int, lotId)
-          .query('UPDATE Lots SET isActive = 0 WHERE id = @id');
+        lot.isActive = false;
+        await lot.save({ transaction: t });
       }
-
-      await transaction.commit();
-    } catch (err) {
-      await transaction.rollback();
-      throw err;
-    }
+    });
   }
 };
 

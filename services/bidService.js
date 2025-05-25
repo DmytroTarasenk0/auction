@@ -1,63 +1,42 @@
-const { poolPromise, sql } = require('../db/sql');
-const Bid = require('../models/bidModel');
-const UserService = require('./userService');
+const { User, Lot, Bid, sequelize } = require('../db/sequelize');
 
 const BidService = {
   async placeBid(userId, lotId, amount) {
-    const pool = await poolPromise;
-    const transaction = new sql.Transaction(pool);
+    return await sequelize.transaction(async (t) => {
+      const user = await User.findByPk(userId, { transaction: t });
+      if (!user || user.balance < amount) throw new Error('Insufficient balance');
 
-    try {
-      await transaction.begin();
-
-      const user = await UserService.getUserById(userId);
-      if (!user || user.balance < amount) {
-        throw new Error('Insufficient balance');
-      }
-
-      const currentRequest = new sql.Request(transaction);
-      const currentResult = await currentRequest
-        .input('lotId', sql.Int, lotId)
-        .query('SELECT * FROM Lots WHERE id = @lotId');
-      const lot = currentResult.recordset[0];
-
+      const lot = await Lot.findByPk(lotId, { transaction: t });
       if (!lot || !lot.isActive) throw new Error('Lot not found or not active');
       if (lot.userId === userId) throw new Error('Cannot bid on your own lot');
 
       const currentPrice = lot.currentPrice || lot.startingPrice;
-      if (amount <= currentPrice) {
-        throw new Error('Bid must be higher than current price');
-      }
+      if (amount <= currentPrice) throw new Error('Bid must be higher than current price');
 
       if (lot.winnerId) {
-        const refundRequest = new sql.Request(transaction);
-        await refundRequest
-          .input('prevUserId', sql.Int, lot.winnerId)
-          .input('refundAmount', sql.Decimal(18, 2), currentPrice)
-          .query('UPDATE Users SET balance = balance + @refundAmount WHERE id = @prevUserId');
+        const prevWinner = await User.findByPk(lot.winnerId, { transaction: t });
+        if (lot.winnerId === userId) {
+          user.balance += parseFloat(currentPrice);
+        } else {
+          prevWinner.balance += parseFloat(currentPrice);
+          await prevWinner.save({ transaction: t });
+        }
       }
 
-      const deductRequest = new sql.Request(transaction);
-      await deductRequest
-        .input('userId', sql.Int, userId)
-        .input('amount', sql.Decimal(18, 2), amount)
-        .query('UPDATE Users SET balance = balance - @amount WHERE id = @userId');
+      user.balance -= parseFloat(amount);
+      await user.save({ transaction: t });
 
-      await deductRequest
-        .input('lotId', sql.Int, lotId)
-        .input('winnerId', sql.Int, userId)
-        .input('currentPrice', sql.Decimal(18, 2), amount)
-        .query(`UPDATE Lots SET winnerId = @winnerId, currentPrice = @currentPrice WHERE id = @lotId`);
+      lot.winnerId = userId;
+      lot.currentPrice = amount;
+      await lot.save({ transaction: t });
 
-      await deductRequest
-        .query(`INSERT INTO Bids (userId, lotId, amount, createdAt)
-                VALUES (@userId, @lotId, @amount, GETDATE())`);
-
-      await transaction.commit();
-    } catch (err) {
-      await transaction.rollback();
-      throw err;
-    }
+      await Bid.create({
+        userId,
+        lotId,
+        amount,
+        createdAt: new Date(),
+      }, { transaction: t });
+    });
   }
 };
 
