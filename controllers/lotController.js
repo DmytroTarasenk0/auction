@@ -3,14 +3,21 @@ const UserService = require('../services/userService');
 
 const lotController = {
   async listLots(req, res) {
-    const lots = await LotService.getAllLots();
+    const page = parseInt(req.query.page) || 1;
+    const status = req.query.status || null;
+    const search = req.query.search || null;
+
+    const { lots, pagination } = await LotService.getAllLots({ page, status, search });
+
     let user = null;
     if (req.session.user) {
       user = await UserService.getUserById(req.session.user.id);
     }
+
     const message = req.session.message;
     req.session.message = null;
-    res.render('lots', { lots, user, message });
+
+    res.render('lots', { lots, user, message, pagination, query: { status, search } });
   },
 
   async viewLot(req, res) {

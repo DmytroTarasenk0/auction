@@ -1,37 +1,45 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <link rel="stylesheet" href="/style.css"></link>
+    <link rel="stylesheet" href="/style.css">
   </head>
-  
-<body>
-  <h1><%= lot.title %></h1>
-  <p><strong>Starting price:</strong> <%= lot.startingPrice %> грн</p>
-  <p><strong>Description:</strong> <%= lot.description %></p>
-  <p><strong>Current Price:</strong> <%= lot.currentPrice || lot.startingPrice %> грн</p>
-  <p><strong>Status:</strong> <%= lot.isActive ? 'active' : 'closed' %></p>
-  <% if (lot.winnerId) { %>
-    <p><strong>Winner ID:</strong> <%= lot.winnerId %></p>
-  <% } %>
-  
-  <% if (user && lot && lot.isActive && user.id !== lot.userId) { %>
-    <form action="/bids/<%= lot.id %>/bid" method="POST">
-      <input type="number" name="amount" step="0.5" min="<%= (lot.currentPrice || lot.startingPrice) + 1 %>" required>
-      <button type="submit">Place Bid</button>
-    </form>
-  <% } %>
+  <body>
+    <div class="container">
+      <% if (user) { %>
+        <div class="top-right">
+          Welcome, <%= user.username %> | Balance: <%= user.balance %> грн
+        </div>
+      <% } %>
 
-  <% if (user && user.id === lot.userId) { %>
-    <% if (lot.isActive) { %>
-    <form action="/lots/<%= lot.id %>/close" method="POST">
-      <button type="submit">Close auction</button>
-    </form>
-  <% } %>
-    <form action="/lots/<%= lot.id %>/delete" method="POST">
-      <button type="submit">Delete lot</button>
-    </form>
-  <% } %>
+      <h1><%= lot.title %></h1>
+      <p><strong>Starting price:</strong> <%= lot.startingPrice %> грн</p>
+      <p><strong>Description:</strong> <%= lot.description %></p>
+      <p><strong>Current price:</strong> <%= lot.currentPrice || lot.startingPrice %> грн</p>
+      <p><strong>Status:</strong> <%= lot.isActive ? 'active' : 'closed' %></p>
 
-  <a href="/">Back to lots</a>
-</body>
+      <% if (lot.winnerId) { %>
+        <p><strong>Winner ID:</strong> <%= lot.winnerId %></p>
+      <% } %>
+
+      <% if (user && lot.isActive && user.id !== lot.userId) { %>
+        <form action="/bids/<%= lot.id %>/bid" method="POST">
+          <input type="number" name="amount" step="0.5" min="<%= (lot.currentPrice || lot.startingPrice) + 1 %>" required />
+          <button type="submit">Place Bid</button>
+        </form>
+      <% } %>
+
+      <% if (user && user.id === lot.userId) { %>
+        <% if (lot.isActive) { %>
+          <form action="/lots/<%= lot.id %>/close" method="POST">
+            <button type="submit">Close auction</button>
+          </form>
+        <% } %>
+        <form action="/lots/<%= lot.id %>/delete" method="POST">
+          <button type="submit">Delete lot</button>
+        </form>
+      <% } %>
+
+      <a href="/">Back to lots</a>
+    </div>
+  </body>
 </html>
