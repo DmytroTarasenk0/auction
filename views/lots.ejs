@@ -1,35 +1,65 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <link rel="stylesheet" href="/style.css"></link>
-  </head>  
+<head>
+  <link rel="stylesheet" href="/style.css">
+</head>
 <body>
+
   <% if (user) { %>
-    <p>Welcome, <%= user.username %> | Balance: <%= user.balance %> грн</p>
-    <form action="/logout" method="get">
-      <button>Logout</button>
-    </form>
-    <form action="/add-funds" method="post">
-      <input type="number" name="amount" placeholder="Sum" required>
-      <button type="submit">Submit</button>
-    </form>
-    <a href="/create">Create lot</a>
-  <% } else { %>
-    <a href="/login">Login</a>
-    <a href="/register">Register</a>
+    <div class="top-bar">
+      <p>Welcome, <%= user.username %> | Balance: <%= user.balance %> грн</p>
+      <form action="/logout" method="get">
+        <button>Logout</button>
+      </form>
+      <form action="/add-funds" method="post">
+        <input type="number" name="amount" placeholder="Sum" required style="width: 100px;" />
+        <button type="submit">Submit</button>
+      </form>
+    </div>
   <% } %>
 
-  <% if (message) { %>
-    <p><%= message %></p>
-  <% } %>
+  <div class="container">
+    <% if (user) { %>
+      <a href="/create">Create lot</a>
+    <% } else { %>
+      <a href="/login">Login</a>
+      <a href="/register">Register</a>
+    <% } %>
 
-  <h2>Lots</h2>
-  <ul>
-    <% lots.forEach(lot => { %>
-      <li>
-        <a href="/lots/<%= lot.id %>"><%= lot.title %></a> - <%= lot.currentPrice || lot.startingPrice %> грн, Status: <%= lot.isActive ? 'active' : 'closed' %>
-      </li>
-    <% }) %>
-  </ul>
+    <% if (message) { %>
+      <p><%= message %></p>
+    <% } %>
+
+    <h2>Lots</h2>
+    <form method="GET" action="/">
+      <input type="text" name="search" value="<%= query.search || '' %>" placeholder="Search by title" />
+      <select name="status">
+        <option value="">All</option>
+        <option value="active" <%= query.status === 'active' ? 'selected' : '' %>>Active</option>
+        <option value="closed" <%= query.status === 'closed' ? 'selected' : '' %>>Closed</option>
+      </select>
+      <button type="submit">Apply</button>
+    </form>
+
+    <ul>
+      <% lots.forEach(lot => { %>
+        <li>
+          <a href="/lots/<%= lot.id %>"><%= lot.title %></a> -
+          <%= lot.currentPrice || lot.startingPrice %> грн, Status: <%= lot.isActive ? 'active' : 'closed' %>
+        </li>
+      <% }) %>
+    </ul>
+
+    <% if (pagination.totalPages > 1) { %>
+      <div class="pagination">
+        <% for (let i = 1; i <= pagination.totalPages; i++) { %>
+          <a href="/?page=<%= i %>&status=<%= query.status || '' %>&search=<%= query.search || '' %>"
+             class="<%= i === pagination.page ? 'active' : '' %>">
+             <%= i %>
+          </a>
+        <% } %>
+      </div>
+    <% } %>
+  </div>
 </body>
 </html>

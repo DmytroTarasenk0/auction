@@ -1,8 +1,34 @@
 const { User, Lot, Bid, sequelize } = require('../db/sequelize');
+const { Op } = require('sequelize');
 
 const LotService = {
-  async getAllLots() {
-    return await Lot.findAll();
+  async getAllLots({ page = 1, pageSize = 5, status, search }) {
+    const offset = (page - 1) * pageSize;
+    const where = {};
+
+    if (status === 'active') where.isActive = true;
+    else if (status === 'closed') where.isActive = false;
+
+    if (search) {
+      where.title = { [Op.like]: `%${search}%` };
+    }
+
+    const { rows: lots, count } = await Lot.findAndCountAll({
+      where,
+      limit: pageSize,
+      offset,
+      order: [['id', 'DESC']]
+    });
+
+    return {
+      lots,
+      pagination: {
+        total: count,
+        page,
+        pageSize,
+        totalPages: Math.ceil(count / pageSize)
+      }
+    };
   },
 
   async getLotById(id) {
